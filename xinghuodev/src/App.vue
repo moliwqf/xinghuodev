@@ -37,12 +37,12 @@
           </div>
         </div>
         <div class="w-full flex absolute bottom-0 left-0 px-4 py-2">
-          <textarea placeholder="Message Spark…"
-                    v-model="message"
-                    id="textInput"
-                    @keydown.enter="sendMessage"
-                    style="max-height: 200px;height: 52px;overflow-y: hidden;"
-                    class="m-0 w-full resize-none border-0 rounded-2xl py-[10px] pr-10 focus:ring-0 focus-visible:ring-0 outline-none dark:bg-transparent md:py-3.5 md:pr-12 placeholder-black/50 dark:placeholder-white/50 pl-3 md:pl-4"></textarea>
+              <textarea placeholder="Message Spark…"
+                        v-model="message"
+                        id="textInput"
+                        @keydown.enter="sendMessage"
+                        style="max-height: 200px;height: 52px;overflow-y: hidden;"
+                        class="m-0 w-full resize-none border-0 rounded-2xl py-[10px] pr-10 focus:ring-0 focus-visible:ring-0 outline-none dark:bg-transparent md:py-3.5 md:pr-12 placeholder-black/50 dark:placeholder-white/50 pl-3 md:pl-4"></textarea>
           <button @click="sendMessage" id="sendMessageBtn"
                   disabled
                   class="absolute bottom-5 rounded-lg border border-black enabled:bg-black disabled:text-gray-400 text-white dark:border-white dark:bg-white right-10 bg-black disabled:opacity-10">
@@ -54,14 +54,21 @@
         </div>
       </div>
     </div>
+    <chat/>
   </div>
 </template>
 
 <script lang="ts">
 import {defineComponent, ref, watch, onMounted, reactive, provide} from 'vue'
+import Chat from "@/components/Chat.vue";
+import Emoji from "@/components/Emoji.vue";
 
 export default defineComponent({
   name: 'App',
+  components: {
+    Chat,
+    Emoji
+  },
   setup() {
     // 面板显示
     const chatShow = ref(true);
@@ -90,7 +97,6 @@ export default defineComponent({
         }
       });
     });
-
     // 监听输入信息
     watch(
         () => message.value,
@@ -135,7 +141,7 @@ export default defineComponent({
 <style>
 .chat-container {
   height: calc(85% - 84px);
-  z-index: 10000;
+  z-index: 999;
   max-height: 600px;
   transition: width, height;
   transition-duration: 0.5s;
@@ -145,6 +151,15 @@ export default defineComponent({
   .chat-container-show {
     width: 800px !important;
   }
+}
+
+.emotion {
+  z-index: 2000;
+  width: 400px;
+  position: absolute;
+  height: 200px;
+  right: 0;
+  bottom: 50px;
 }
 
 @media (min-width: 760px) {
@@ -166,6 +181,10 @@ export default defineComponent({
 
 .br-popper {
   border-radius: 5px 20px 20px 20px;
+}
+
+.bl-popper {
+  border-radius: 20px 5px 20px 20px;
 }
 
 .pd-10 {
