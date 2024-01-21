@@ -1,0 +1,16 @@
+/* 在这里定义动画的样式 */
+.animation {
+    width: 100px;
+    height: 100px;
+    background-color: #3498db;
+    animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        transform: scale(1);
+    }
+    to {
+        transform: scale(1.2);
+    }
+}

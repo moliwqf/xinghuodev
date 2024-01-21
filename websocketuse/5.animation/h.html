@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <title>语音播放动画</title>
+    <style>
+        .voice{
+            padding-top: 12px;
+            padding-left: 10px;
+            margin: 100px auto;
+            height: 35px;
+            width: 50px;
+            background: #1bbc9b;
+            border-radius: 0 7px 7px;
+        }
+
+        .bg {
+            background:url('voice-animate.png') right 0 no-repeat;
+            width: 24px;
+            height: 24px;
+            background-size: 400%;
+        }
+
+        .voicePlay {
+            animation-name: voicePlay;
+            animation-duration: 1s;
+            animation-direction: normal;
+            animation-iteration-count: infinite;
+            animation-timing-function: steps(3);
+        }
+
+        @keyframes voicePlay {
+            0% {
+                background-position: 0;
+            }
+            100% {
+                background-position: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="voice">
+    <div class="bg voicePlay"></div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>

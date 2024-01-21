@@ -1,138 +1,89 @@
 <template>
-  <div class="w-full h-screen">
-    <div class="fixed bottom-5 left-5 bg-red-400 w-10 h-10" @click="clickBootHandler"></div>
-    <div id="chatContainer" :class="chatShow ? 'chat-container-show' : 'chat-container-hidden'"
-         class="fixed rounded-2xl bottom-10 left-16 min-h-64 bg-slate-100 chat-container shadow-2xl">
-      <div :class="chatShow ? 'block' : 'hidden'">
-        <div class="flex w-full bg-white px-6 py-5 items-center">
-          <img class="w-8 h-8" src="@/assets/x-spark.png" alt="星火图像">
-          <div class="items-center mx-2 flex">How can I help you today?</div>
-          <svg t="1705558295300" class="icon ml-auto cursor-pointer" @click="clickBootHandler" viewBox="0 0 1024 1024"
-               version="1.1"
-               xmlns="http://www.w3.org/2000/svg" p-id="1640" width="16" height="16">
-            <path d="M0 0h1024v1024H0z" fill="#bfbfbf" fill-opacity="0" p-id="1641"></path>
-            <path
-                d="M240.448 168l2.346667 2.154667 289.92 289.941333 279.253333-279.253333a42.666667 42.666667 0 0 1 62.506667 58.026666l-2.133334 2.346667-279.296 279.210667 279.274667 279.253333a42.666667 42.666667 0 0 1-58.005333 62.528l-2.346667-2.176-279.253333-279.253333-289.92 289.962666a42.666667 42.666667 0 0 1-62.506667-58.005333l2.154667-2.346667 289.941333-289.962666-289.92-289.92a42.666667 42.666667 0 0 1 57.984-62.506667z"
-                fill="#bfbfbf" p-id="1642"></path>
-          </svg>
-        </div>
-        <div class="px-4 w-full py-5 pb-0 overflow-y-auto" id="chat">
-          <div class="flex mb-2">
-            <img src="@/assets/spark-user.png" class="w-10 h-10 mr-3 cursor-pointer" alt="">
-            <div class="flex flex-col" style="max-width: calc(100% - 50px)">
-              <div class="font-semibold select-none mb-2">You</div>
-              <div class="flex-col flex br-popper bg-white text-base pd-10 break-words">
-                sadfsadfsadsadfsadfsadsadfsadfsadsadfsadfsadsadfsadfsadsadfsadfsadsadfsadfsadsadfsadfsadsadfsadfsad
-              </div>
-            </div>
-          </div>
-          <div class="flex mb-2">
-            <img src="@/assets/x-spark.png" class="w-10 h-10 mr-3 cursor-pointer" alt="">
-            <div class="flex flex-col text-base" style="max-width: calc(100% - 50px)">
-              <div class="font-semibold flex select-none mb-2">Spark</div>
-              <div class="flex-col flex br-popper bg-white pd-10 break-words">
-                sadfsadfsadsadfsadfsadsadfsdsadfsadfsadsadfsadfsadsadfsadfsad
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="w-full flex absolute bottom-0 left-0 px-4 py-2">
-              <textarea placeholder="Message Spark…"
-                        v-model="message"
-                        id="textInput"
-                        @keydown.enter="sendMessage"
-                        style="max-height: 200px;height: 52px;overflow-y: hidden;"
-                        class="m-0 w-full resize-none border-0 rounded-2xl py-[10px] pr-10 focus:ring-0 focus-visible:ring-0 outline-none dark:bg-transparent md:py-3.5 md:pr-12 placeholder-black/50 dark:placeholder-white/50 pl-3 md:pl-4"></textarea>
-          <button @click="sendMessage" id="sendMessageBtn"
-                  disabled
-                  class="absolute bottom-5 rounded-lg border border-black enabled:bg-black disabled:text-gray-400 text-white dark:border-white dark:bg-white right-10 bg-black disabled:opacity-10">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="text-white dark:text-black">
-              <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-    <chat/>
+  <div class="w-full h-screen" v-show="isLogin">
+    <div>{{ obj.output }}<span class="easy-typed-cursor">|</span></div>
+    <div class="fixed bottom-5 left-5 bg-red-400 w-10 h-10"
+         @click="clickBootHandler"></div>
+    <AIChat id="aiContainer"/>
+    <Chat/>
   </div>
+  <login v-if="!isLogin" @showMain="displayMainHandler"/>
 </template>
 
 <script lang="ts">
-import {defineComponent, ref, watch, onMounted, reactive, provide} from 'vue'
-import Chat from "@/components/Chat.vue";
-import Emoji from "@/components/Emoji.vue";
+import {defineComponent, ref, watch, onMounted, onBeforeMount, provide, getCurrentInstance} from 'vue'
+import Chat from "@/components/ChatRoom/Chat.vue";
+import Emoji from "@/components/Emoji/EmojiItem.vue";
+import {socketInstance, getSocket} from '@/components/socket-client';
+import Login from "@/components/Login.vue";
+import EasyTyper from 'easy-typer-js'
+import {reactive} from "@vue/reactivity";
+import AIChat from "@/components/AIChat/AIChat.vue";
 
 export default defineComponent({
   name: 'App',
   components: {
     Chat,
-    Emoji
+    Emoji,
+    Login,
+    AIChat
   },
-  setup() {
-    // 面板显示
-    const chatShow = ref(true);
-    // 输入的信息
-    const message: any = ref('');
-    // textarea html对象
-    let input: any = null;
-    // 发送按钮
-    let btn: any = null;
-    let chatContainer: any = null;
+  setup(props, ctx) {
+    const obj = reactive({
+      output: '',
+      isEnd: false,
+      speed: 80,
+      singleBack: true,
+      sleep: 0,
+      type: 'normal',
+      backSpeed: 40,
+      sentencePause: true
+    });
+    const {proxy}: any = getCurrentInstance();
+    const isLogin = ref(true);
+    const chatShow = ref(true); // 面板显示
+    let aiContainer: any = null; // ai-container
+    const socket = socketInstance(); // 获取socket连接
+    // 向 AIChat组件提供chatShow
+    provide('chatShow', chatShow);
     // 显示面板
     const clickBootHandler = (event: any) => {
       event.stopPropagation();
       chatShow.value = !chatShow.value;
+      console.log(chatShow)
     };
+    // 连接成功
+    const connectSocket = () => {
+      socket.on('connect', () => { // 默认通道 connect是通道名称
+        console.log('连接成功');
+      });
+    };
+    onBeforeMount(() => {
+      connectSocket();
+    })
     // 初始化html对象
     onMounted(() => {
-      input = document.getElementById('textInput');
-      btn = document.getElementById('sendMessageBtn');
-      chatContainer = document.getElementById('chatContainer');
-
+      const typed = new EasyTyper(obj, `我是Vue3输出的内容`, () => {
+        console.log('输入完毕');
+      }, () => {
+      });
+      aiContainer = document.getElementById('aiContainer');
       document.addEventListener('click', (event) => {
-        let isSelf = chatContainer.contains(event.target);
+        let isSelf = aiContainer.contains(event.target);
         if (!isSelf) {
           chatShow.value = false;
         }
       });
     });
-    // 监听输入信息
-    watch(
-        () => message.value,
-        (msg: any) => {
-          // 实现自适应textarea
-          const hiddenArea = document.createElement('textarea');
-          hiddenArea.classList.add(...input.classList);
-          // hiddenArea.style.visibility = 'hidden';
-          hiddenArea.value = input.value;
-          hiddenArea.style.height = '52px';
-          hiddenArea.style.width = input.clientWidth + 'px';
-          document.body.appendChild(hiddenArea);
-          const currentHeight = hiddenArea.scrollHeight;
-          if (currentHeight < 200) {
-            input.style.overflowY = 'hidden';
-          } else {
-            input.style.overflowY = 'auto';
-          }
-          input.style.height = currentHeight + 'px';
-
-          // 如果有内容，设置按钮可用
-          btn.disabled = !msg;
-        }
-    );
-    // 发送消息
-    const sendMessage = (event: any) => {
-      console.log("发送消息");
-      event.preventDefault();
-      message.value = '';
-    };
+    const displayMainHandler = () => {
+      isLogin.value = true;
+    }
 
     return {
       chatShow,
       clickBootHandler,
-      message,
-      sendMessage
+      isLogin,
+      displayMainHandler,
+      obj
     }
   }
 });
@@ -147,19 +98,59 @@ export default defineComponent({
   transition-duration: 0.5s;
 }
 
+.easy-typed-cursor {
+  margin-left: 5px;
+  opacity: 1;
+  -webkit-animation: blink 0.7s infinite;
+  -moz-animation: blink 0.7s infinite;
+  animation: blink 0.7s infinite;
+}
+
+@keyframes blink {
+  0% {
+    opacity: 1
+  }
+  50% {
+    opacity: 0
+  }
+  100% {
+    opacity: 1
+
+  }
+}
+
+
+@-webkit-keyframes blink {
+  0% {
+    opacity: 1
+  }
+  50% {
+    opacity: 0
+  }
+  100% {
+    opacity: 1
+
+  }
+}
+
+@-moz-keyframes blink {
+  0% {
+    opacity: 1
+  }
+  50% {
+    opacity: 0
+  }
+  100% {
+    opacity: 1
+
+  }
+}
+
+
 @media (min-width: 1000px) {
   .chat-container-show {
     width: 800px !important;
   }
-}
-
-.emotion {
-  z-index: 2000;
-  width: 400px;
-  position: absolute;
-  height: 200px;
-  right: 0;
-  bottom: 50px;
 }
 
 @media (min-width: 760px) {
@@ -179,19 +170,45 @@ export default defineComponent({
   height: 0 !important;
 }
 
-.br-popper {
-  border-radius: 5px 20px 20px 20px;
+
+div::-webkit-scrollbar {
+  width: 10px; /* 设置滚动条的宽度 */
 }
 
-.bl-popper {
-  border-radius: 20px 5px 20px 20px;
+/* 设置滚动条的轨道背景色 */
+div::-webkit-scrollbar-track {
+  background-color: #fff;
 }
 
-.pd-10 {
-  padding: 10px;
+/* 设置滚动条的滑块样式 */
+div::-webkit-scrollbar-thumb {
+  background-color: #e1e1e9;
+  border-radius: 6px; /* 设置滑块的圆角 */
 }
 
-.send-msg {
-  padding: 10px 48px 0 10px;
+/* 当滑块被激活（被点击）时的样式 */
+div::-webkit-scrollbar-thumb:hover {
+  background-color: #d9d9e3;
+}
+
+/* 设置滚动条轨道的样式 */
+textarea::-webkit-scrollbar {
+  width: 10px; /* 设置滚动条的宽度 */
+}
+
+/* 设置滚动条的轨道背景色 */
+textarea::-webkit-scrollbar-track {
+  background-color: #fff;
+}
+
+/* 设置滚动条的滑块样式 */
+textarea::-webkit-scrollbar-thumb {
+  background-color: #e1e1e9;
+  border-radius: 6px; /* 设置滑块的圆角 */
+}
+
+/* 当滑块被激活（被点击）时的样式 */
+textarea::-webkit-scrollbar-thumb:hover {
+  background-color: #d9d9e3;
 }
 </style>
