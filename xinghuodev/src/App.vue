@@ -53,9 +53,12 @@ export default defineComponent({
     };
     // 连接成功
     const connectSocket = () => {
-      socket.on('connect', () => { // 默认通道 connect是通道名称
+      /*socket.on('connect', () => { // 默认通道 connect是通道名称
         console.log('连接成功');
-      });
+      });*/
+      socket.onopen = () => {
+        console.log('连接建立');
+      }
     };
     onBeforeMount(() => {
       connectSocket();

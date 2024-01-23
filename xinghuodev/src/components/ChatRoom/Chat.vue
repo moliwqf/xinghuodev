@@ -20,18 +20,29 @@
     </div>
     <div class="px-4 w-full max-h-[calc(100%-128px)] py-5 pb-0 overflow-auto" id="chatRoom">
       <div class="flex mb-2" v-for="data in messages" :key="data.user"
-           :class="data.user === user ? 'flex-row-reverse' : ''">
+           :class="data.fromUserId === userId ? 'flex-row-reverse' : ''">
         <img src="../../assets/spark-user.png"
-             :class="data.user === user ? 'ml-[10px]' : 'mr-[10px]'"
+             :class="data.fromUserId === userId ? 'ml-[10px]' : 'mr-[10px]'"
              class="w-10 h-10 cursor-pointer">
         <div class="flex flex-col" style="max-width: calc(100% - 100px)">
+
           <div class="text-[12px] select-none mb-[5px] mt-[3px]"
-               :class="data.user === user ? 'text-right' : ''">
-            {{ data.user === user ? '我' : data.user }}
+               :class="data.fromUserId === userId ? 'text-right' : ''">
+            {{ data.fromUserId === userId ? '我' : data.fromUserId }}
           </div>
-          <div :class="data.user === user ? 'bl-popper' : 'br-popper'"
-               v-html="data.content"
-               class="flex bg-white text-base pd-10 break-words">
+          <div :class="data.fromUserId === userId ? 'bl-popper' : 'br-popper'"
+               class="flex bg-white text-base p-[10px] break-words">
+            <div v-if="data.contentType === 0" v-html="data.content"></div>
+            <div v-if="data.contentType === 2"
+                 @click="handleAudioPlay($event)"
+                 class="voice-static bg-cover cursor-pointer bg-center w-[24px] h-[24px]">
+              <audio controls data-event="0"
+                     data-playing="0"
+                     hidden>
+                <source :src="data.content">
+              </audio>
+            </div>
+            <span v-if="data.contentType === 2">{{data.duration}}"</span>
           </div>
         </div>
       </div>
@@ -100,6 +111,7 @@ import {getSocket} from "@/components/socket-client";
 import {reactive} from "@vue/reactivity";
 import RecordingAnimate from "@/components/ChatRoom/RecordingAnimate.vue";
 import Recorder from "js-audio-recorder";
+import {createUserId, processContent} from '@/util/createUserId'
 
 
 export default defineComponent({
@@ -121,7 +133,7 @@ export default defineComponent({
     const isRecording = ref(false); // 是否处于录音中
     const isVoice = ref(false); // 是否处于录音界面
     const voiceText = ref('按住说话'); // 录音下的文字显示
-
+    const userId = createUserId();
     // 开始录音
     const startRecording = () => {
       isRecording.value = true;
@@ -141,25 +153,21 @@ export default defineComponent({
       isRecording.value = false;
       recorder.value.stop();
       mediaStream.value.getAudioTracks().forEach((track: any) => track.stop());
-
       // 上传录音文件
-      const formData = new FormData();
+      // 自定义协议 - 首4字节表示发送者，接着4字节表示接受者，然后1字节表示文件类型
+      let buffer = new ArrayBuffer(9);
+      let dataView = new DataView(buffer);
+      dataView.setInt32(0, userId);
+      dataView.setInt32(4, 0);
+      dataView.setInt8(8, 2);
       const blob: any = recorder.value.getWAVBlob();
-      const newBlob = new Blob([blob], {type: 'audio/wav'});
-      const fileOfBlob = new File([newBlob], new Date().getTime() + '.wav');
-      formData.append('file', fileOfBlob);
-      const url = window.URL.createObjectURL(fileOfBlob);
-
+      const newBlob = new Blob([buffer, blob], {type: 'audio/wav'});
+      socket.send(newBlob);
       // 修改文本
-      recorder.value.play();
       voiceText.value = "按住说话";
     };
 
-    const injectData = () => {
-      socket.on('chat', (username: any) => {
-        user.value = username;
-      });
-    };
+
     // 到达底端
     const scrollIntoView = () => {
       nextTick(() => {
@@ -170,16 +178,37 @@ export default defineComponent({
         }
       });
     };
-    const receiveMessage = () => {
+
+    // socket io 形式
+    /*const receiveMessage = () => {
       socket.on('receiveMessage', (data: any) => {
         messages.push(data);
         scrollIntoView();
       })
     };
+    const injectData = () => {
+      socket.on('chat', (username: any) => {
+        user.value = username;
+      });
+    };
+    */
+    const receiveMessage = () => {
+      socket.onmessage = (data: any) => {
+        let message = JSON.parse(data.data);
+        if (message.flag) {
+          if (message.data.contentType === 0) {
+            message.data.content = processContent(message.data.content);
+          }
+          messages.push(message.data);
+          scrollIntoView();
+        }
+      }
+    }
     onMounted(() => {
       chatBtn = document.getElementById('chatBtn');
       chatRoom = document.getElementById('chatRoom');
-      injectData();
+      /*injectData();
+      receiveMessage();*/
       receiveMessage();
     });
     // 监听发送的消息
@@ -189,13 +218,19 @@ export default defineComponent({
           chatBtn.disabled = !value;
         }
     );
+
     // 发送消息
     const sendMessage = () => {
       // 发送信息
-      socket.emit('sendMessage', {
+      /*socket.emit('sendMessage', {
         content: content.value.toString(),
         user: user.value
-      });
+      });*/
+      let message = {
+        userId: userId,
+        content: content.value.toString()
+      }
+      socket.send(JSON.stringify(message));
       // 清空内容
       content.value = '';
     };
@@ -215,6 +250,34 @@ export default defineComponent({
         emojiImg.value = require('@/assets/emoji.png');
       }
     };
+    // 控制音频播放
+    const handleAudioPlay = (e:any) => {
+      const parent:any = e.target;
+      // 1. 获取audio元素
+      const audio:any = parent.children[0];
+      // 2. 为audio添加事件 - 如果data-event为0
+      if (audio.getAttribute('data-event') === '0') {
+        audio.addEventListener('ended', () => {
+          audio.setAttribute('data-playing', '0');
+          parent.classList.add('voice-static');
+          parent.classList.remove('voice-run');
+        });
+        audio.setAttribute('data-event', '1');
+      }
+      // 3. 获取是否在播放
+      const isPlaying = audio?.getAttribute('data-playing');
+      if (isPlaying === '0') {
+        audio.setAttribute('data-playing', '1');
+        audio.play();
+        parent.classList.remove('voice-static');
+        parent.classList.add('voice-run');
+      } else {
+        audio.setAttribute('data-playing', '0');
+        audio.pause();
+        parent.classList.add('voice-static');
+        parent.classList.remove('voice-run');
+      }
+    }
     return {
       content,
       emojiListShow,
@@ -229,7 +292,9 @@ export default defineComponent({
       isVoice,
       voiceText,
       startRecording,
-      stopRecording
+      stopRecording,
+      userId,
+      handleAudioPlay
     }
   }
 })
@@ -244,6 +309,22 @@ img {
   height: calc(85% - 84px);
   z-index: 10000;
   max-height: 600px;
+}
+
+.voice-static {
+  background-image: url("@/assets/voice-static.png");
+}
+
+.voice-run {
+  background-image: url("@/assets/voice-run.gif");
+}
+
+.br-popper {
+  border-radius: 5px 20px 20px 20px;
+}
+
+.bl-popper {
+  border-radius: 20px 5px 20px 20px;
 }
 
 .bounceInUp {
